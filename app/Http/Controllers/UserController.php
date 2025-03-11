@@ -5,6 +5,7 @@
     use App\Http\Requests\GetUsersRequest;
     use App\Http\Requests\RegisterUserRequest;
     use App\Models\User;
+    use App\Services\ImageProcessingService;
     use App\Traits\ApiResponseTrait;
     use Illuminate\Http\JsonResponse;
     use Illuminate\Pagination\LengthAwarePaginator;
@@ -13,6 +14,13 @@
     class UserController extends Controller
     {
         use ApiResponseTrait;
+
+        protected $imageProcessingService;
+
+        public function __construct(ImageProcessingService $imageProcessingService)
+        {
+            $this->imageProcessingService = $imageProcessingService;
+        }
 
         /**
          * Register a new user.
@@ -23,10 +31,10 @@
         public function register(RegisterUserRequest $request): JsonResponse
         {
             try {
-                $photoPath = $this->storePhoto($request);
+                $photoPath = $this->imageProcessingService->storeAndOptimizePhoto($request);
 
                 if (!$photoPath) {
-                    return $this->errorResponse('Failed to upload photo.', 500);
+                    return $this->errorResponse('Failed to upload and optimize photo.', 500);
                 }
 
                 $user = User::create(array_merge($request->validated(), ['photo' => $photoPath]));
@@ -85,19 +93,6 @@
             }
 
             return $this->successResponse(['user' => $this->formatUser($user)]);
-        }
-
-        /**
-         * Store user photo.
-         *
-         * @param RegisterUserRequest $request
-         * @return string|null
-         */
-        private function storePhoto(RegisterUserRequest $request): ?string
-        {
-            return $request->hasFile('photo')
-                ? $request->file('photo')->store('photos', 'public')
-                : null;
         }
 
         /**
