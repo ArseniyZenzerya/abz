@@ -31,7 +31,8 @@
         public function register(RegisterUserRequest $request): JsonResponse
         {
             try {
-                $photoPath = $this->imageProcessingService->storeAndOptimizePhoto($request);
+                $photo = $request->file('photo');
+                $photoPath = $this->imageProcessingService->storeAndOptimizePhoto($photo);
 
                 if (!$photoPath) {
                     return $this->errorResponse('Failed to upload and optimize photo.', 500);
@@ -42,6 +43,8 @@
                 if (!$user) {
                     return $this->errorResponse('Failed to create user.', 500);
                 }
+
+                $user->load('position');
 
                 Cache::forget('registration_token');
                 return $this->successResponse(['user' => $user], 201);
@@ -123,7 +126,7 @@
                 'position' => $user->position->name ?? null,
                 'position_id' => $user->position_id,
                 'registration_timestamp' => $user->created_at->timestamp,
-                'photo' => asset('storage/' . $user->photo),
+                'photo' => asset($user->photo),
             ];
         }
 

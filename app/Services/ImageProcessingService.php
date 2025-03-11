@@ -6,16 +6,21 @@
     use Tinify\Source;
     use Exception;
     use Illuminate\Http\UploadedFile;
+    use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Facades\Storage;
 
     /**
      * Class ImageProcessingService
      *
      * Service for image processing using the Tinify API.
+     * This service handles image uploading, optimization, cropping, and storage.
      */
     class ImageProcessingService
     {
         /**
          * ImageProcessingService constructor.
+         *
+         * Initializes the service and sets the Tinify API key.
          *
          * @throws Exception If the Tinify API key is not set in the .env file.
          */
@@ -59,6 +64,7 @@
                 ]);
                 $resized->toFile($outputPath);
             } catch (Exception $e) {
+                Log::error("Tinify error: " . $e->getMessage());
                 throw new Exception("Error during image processing: " . $e->getMessage());
             }
         }
@@ -72,11 +78,83 @@
          */
         public function storeAndOptimizePhoto(UploadedFile $photo): ?string
         {
-            $photoPath = $photo->store('photos', 'public');
-            $storagePath = storage_path("app/public/$photoPath");
+            $storagePath = $this->storePhotoInStorage($photo);
 
-            $this->cropAndOptimizeImage($storagePath, $storagePath);
+            $this->optimizePhoto($storagePath);
 
-            return $photoPath;
+            $publicPath = $this->movePhotoToPublic($storagePath);
+
+            return $publicPath;
+        }
+
+        /**
+         * Saves the uploaded photo to the storage directory.
+         *
+         * @param UploadedFile $photo The uploaded file instance.
+         * @return string The full path to the stored photo.
+         * @throws Exception If the file cannot be saved.
+         */
+        private function storePhotoInStorage(UploadedFile $photo): string
+        {
+            $fileName = 'photos/' . uniqid() . '.' . $photo->getClientOriginalExtension();
+            $photo->storeAs('public/photos', basename($fileName));
+
+            return storage_path('app/public/photos/' . basename($fileName));
+        }
+
+        /**
+         * Optimizes and crops the photo.
+         *
+         * @param string $filePath The full path to the photo.
+         * @throws Exception If optimization fails.
+         */
+        private function optimizePhoto(string $filePath): void
+        {
+            try {
+                $this->cropAndOptimizeImage($filePath, $filePath);
+            } catch (Exception $e) {
+                Storage::delete('public/photos/' . basename($filePath));
+                Log::error("Failed to optimize image: " . $e->getMessage());
+                throw new Exception("Failed to optimize the image.");
+            }
+        }
+
+        /**
+         * Moves the photo from storage to the public directory.
+         *
+         * @param string $storagePath The full path to the photo in storage.
+         * @return string The relative path to the photo in the public directory.
+         * @throws Exception If the file cannot be moved.
+         */
+        private function movePhotoToPublic(string $storagePath): string
+        {
+            $publicPath = public_path('photos');
+            $this->ensureDirectoryExists($publicPath);
+
+            $fileName = basename($storagePath);
+            $fullPublicPath = $publicPath . '/' . $fileName;
+
+            if (!rename($storagePath, $fullPublicPath)) {
+                Log::error("Failed to move file to: " . $fullPublicPath);
+                throw new Exception("Failed to move the file to public directory.");
+            }
+
+            return 'photos/' . $fileName;
+        }
+
+        /**
+         * Ensures that the specified directory exists.
+         *
+         * @param string $directory The directory path.
+         * @throws Exception If the directory cannot be created.
+         */
+        private function ensureDirectoryExists(string $directory): void
+        {
+            if (!file_exists($directory)) {
+                if (!mkdir($directory, 0777, true)) {
+                    Log::error("Failed to create directory: " . $directory);
+                    throw new Exception("Failed to create directory for photos.");
+                }
+            }
         }
     }

@@ -12,7 +12,7 @@
         {
             $faker = Faker::create();
             $positions = [1, 2, 3, 4];
-            $defaultPhoto = 'storage/photos/default.jpg';
+            $defaultPhoto = 'images/default.jpg';
 
             for ($i = 0; $i < 45; $i++) {
                 $name = $faker->name();
