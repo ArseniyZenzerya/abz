@@ -45,7 +45,12 @@
                 <small v-if="errors.phone" class="text-danger">{{ errors.phone }}</small>
             </div>
             <div class="form-group">
-                <input v-model="newUser.position_id" type="number" class="form-control" placeholder="Position ID" required />
+                <select v-model="newUser.position_id" class="form-control" required>
+                    <option value="" disabled>Select Position</option>
+                    <option v-for="position in positions" :key="position.id" :value="position.id">
+                        {{ position.name }}
+                    </option>
+                </select>
                 <small v-if="errors.position_id" class="text-danger">{{ errors.position_id }}</small>
             </div>
             <div class="form-group">
@@ -64,6 +69,7 @@ export default {
     data() {
         return {
             users: [],
+            positions: [],
             page: 1,
             perPage: 6,
             totalPages: 1,
@@ -97,6 +103,16 @@ export default {
                 }
             } catch (error) {
                 console.error('Error fetching users:', error);
+            }
+        },
+        async fetchPositions() {
+            try {
+                const response = await axios.get('/api/positions');
+                if (response.data && response.data.positions) {
+                    this.positions = response.data.positions;
+                }
+            } catch (error) {
+                console.error('Error fetching positions:', error);
             }
         },
         async fetchToken() {
@@ -170,6 +186,7 @@ export default {
     },
     mounted() {
         this.fetchUsers();
+        this.fetchPositions();
     }
 };
 </script>
